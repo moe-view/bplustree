@@ -1,0 +1,43 @@
+{
+  "name": "bplustree-typescript",
+  "version": "0.0.1",
+  "description": "bplustree implementation in typescript",
+  "engines": {
+    "node": ">= 10.9.0",
+    "npm": ">= 6.2.0",
+    "yarn": ">=1.1.0"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "bdd": "yarn run jest --watch --onlyChanged",
+    "build": "yarn run tsc",
+    "ci:build-check": "yarn run build",
+    "ci:format": "yarn run format && yarn run diff-check",
+    "ci:lint": "yarn run tslint",
+    "ci:test": "yarn run jest --ci --silent --runInBand",
+    "coverage": "yarn run jest --collectCoverage",
+    "diff-check": "git diff --exit-code --name-only ./modules ./projects",
+    "format": "yarn run format:ts",
+    "format:ts": "yarn run format:ts:import && prettier --config .prettierrc --write '{modules,projects}/**/*.ts'",
+    "format:ts:import": "import-sort --write '{modules,projects}/**/*.ts'",
+    "jest": "jest -c jest.config.js",
+    "test": "yarn run jest",
+    "tsc": "tsc -p tsconfig.json",
+    "tslint": "tslint -p tsconfig.json"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "@types/jest": "^23.3.1",
+    "@types/node": "^10.9.3",
+    "jest": "^23.5.0",
+    "prettier": "^1.14.2",
+    "ts-jest": "^23.1.4",
+    "ts-node": "^7.0.1",
+    "tslint": "^5.11.0",
+    "tslint-eslint-rules": "^5.4.0",
+    "typescript": "^3.0.3",
+    "vrsource-tslint-rules": "^5.8.2"
+  }
+}

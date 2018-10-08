@@ -1,0 +1,31 @@
+.DS_Store
+ehthumbs.db
+Icon?
+Thumbs.db
+.idea
+
+# IDE - VSCode
+.vscode
+.history
+
+# Node Files #
+/node_modules
+/bower_components
+npm-debug.log
+
+# Typing #
+/modules/typings/tsd/
+/typings/
+/tsd_typings/
+
+# Dist #
+/dist/
+/__build__/**
+.webpack.json
+
+# Coverage #
+/coverage/
+
+# config and env files
+/config
+.env

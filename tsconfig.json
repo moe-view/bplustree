@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2016",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "types": ["node", "jest"],
+    "typeRoots": ["./node_modules/@types"],
+    "rootDir": "./",
+    "outDir": "./dist",
+    "declaration": true,
+    "baseUrl": "./",
+    "paths": {
+      "@bronx/book": ["./modules/book"],
+      "@bronx/common": ["./modules/common"],
+      "@bronx/orderbook": ["./modules/orderbook"],
+      "@bronx/types": ["./modules/types"]
+    }
+  },
+  "include": [
+    "./modules/**/*.ts",
+    "./projects/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
