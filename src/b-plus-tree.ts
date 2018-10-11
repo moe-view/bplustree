@@ -12,14 +12,53 @@ export abstract class BPlusTreeNode<T> {
 
   abstract insert(value: T): void;
   abstract splitIfNeeded(): void;
+  abstract delete(value: T): boolean;
 
-  isRoot(): boolean {
+  get isRoot(): boolean {
     return this.parent === null;
   }
 
+  rebalancingIfNeed(): void {
+    if (this.isRoot && !this.isLeaf && this.data.length === 0 && this instanceof BPlusTreeInternalNode && this.children.length === 1) {
+      // need to remove this root, update owner new root, own's height 1 down
+      this.children[0].parent = null;
+      this.owner.updateRoot();
+    }
+    // min data length: owner's nodeMinLength
+    const nodeMinLength = this.owner.nodeMinLength;
+    if (this.isRoot || this.data.length >= nodeMinLength) {
+      // no need to rebalancing
+      return;
+    }
+
+    const [leftSibling, rightSibling, index] = this.getLeftRightSibling();
+
+    if (leftSibling && leftSibling.data.length > nodeMinLength) {
+      // rotate right for leaf
+      this.rotateRight(leftSibling, index - 1);
+    } else if (rightSibling && rightSibling.data.length > nodeMinLength) {
+      // rotate left leaf
+      this.rotateLeft(rightSibling, index);
+    } else {
+      // merge with left or right sibling
+      if (leftSibling) {
+        // merge with left sibling
+        leftSibling.mergeRight(this, index - 1);
+      } else if (rightSibling) {
+        // merge with right sibling
+        this.mergeRight(rightSibling, index);
+      } else {
+        throw new Error('can not merge leaf, both left and right sibling not exist');
+      }
+    }
+  }
+
+  protected abstract rotateRight(leftSibling: BPlusTreeNode<T>, index: number): void;
+  protected abstract rotateLeft(rightSibling: BPlusTreeNode<T>, index: number): void;
+  protected abstract mergeRight(rightSibling: BPlusTreeNode<T>, index: number): void;
+
   /**
-   * 
-   * @param middleData 
+   * @param middleData
    * @param newNode middleData's right node
    */
   protected addParent(middleData: T, newNode: BPlusTreeNode<T>) {
@@ -41,13 +80,33 @@ export abstract class BPlusTreeNode<T> {
     }
   }
 
-  // find index location where data[index] > value for the first time
+  // find index location where value < data[index] for the first time
   protected getLocation(value: T): number {
     const compareFunc = this.owner.compareFunc;
     let index = 0;
     while (index < this.data.length && compareFunc(value, this.data[index]) >= 0) { index++; }
 
     return index;
+  }
+
+  protected getLeftRightSibling(): [BPlusTreeNode<T> | null, BPlusTreeNode<T> | null, number] {
+    // root have no sibling
+    if (this.parent === null) {
+      return [null, null, -1];
+    }
+
+    // this node position in parent's children
+    let index = 0;
+    for (; index < this.parent.children.length; index++) {
+      if (this.parent.children[index] === this) { break; }
+    }
+
+    // if not found, abnormal case -> tree is wrong
+    if (index >= this.parent.children.length) {
+      throw new Error('this node\'s parent\'s children not contain this');
+    }
+
+    return [this.parent.children[index - 1] || null, this.parent.children[index + 1] || null, index];
   }
 }
 
@@ -111,6 +170,79 @@ export class BPlusTreeLeafNode<T> extends BPlusTreeNode<T> {
       this.parent.splitIfNeeded();
     }
   }
+
+  delete(value: T): boolean {
+    const index = this.getLocation(value) - 1;
+    const compareFunc = this.owner.compareFunc;
+    if (compareFunc(value, this.data[index]) === 0) {
+      // remove data from leaf
+      this.data.splice(index, 1);
+      // rebalancing if needed
+      this.rebalancingIfNeed();
+
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   *
+   * @param leftSibling
+   * @param index parent position of separator
+   */
+  protected rotateRight(leftSibling: BPlusTreeNode<T>, index: number) {
+    if (!this.parent || !this.isLeaf) {
+      return;
+    }
+
+    // rotate right leaf:
+    //  - move last data of left node to current node first data
+    //  - assign separator = moved element
+
+    // move data
+    const movedData = leftSibling.data.splice(-1, 1)[0];
+    this.data.unshift(movedData);
+
+    // update separator
+    this.parent.data[index] = movedData;
+  }
+
+  protected rotateLeft(rightSibling: BPlusTreeNode<T>, index: number) {
+    if (!this.parent || !this.isLeaf) {
+      return;
+    }
+    // rotate left leaf:
+    //  - move first element of right node to current node last
+    //  - assign separator = right node new first element
+
+    // move data
+    const movedData = rightSibling.data.shift();
+    if (movedData) { this.data.push(movedData); }
+
+    // update separator
+    this.parent.data[index] = rightSibling.data[0];
+  }
+
+  protected mergeRight(rightNode: BPlusTreeNode<T>, index: number) {
+    if (!this.parent || !this.isLeaf || !rightNode.isLeaf || !(rightNode instanceof BPlusTreeLeafNode)) {
+      return;
+    }
+
+    // merge right:
+    //  - move all right node's data to current data
+    //  - update link to skip right node
+    //  - remove parent separator
+    //  - remove rightNode from parent (index + 1)
+    //  - release rightNode data ?
+    //  - call rebalancingIfNeed on parent recursively
+    this.data = this.data.concat(rightNode.data);
+    this.nextNode = rightNode.nextNode;
+    this.parent.data.splice(index, 1);
+    this.parent.children.splice(index + 1, 1);
+
+    this.parent.rebalancingIfNeed();
+  }
 }
 
 /**
@@ -134,8 +266,7 @@ export class BPlusTreeInternalNode<T> extends BPlusTreeNode<T> {
   }
 
   /**
-   * 
-   * @param value 
+   * @param value
    * @param child value's right node
    */
   insertPurely(value: T, child: BPlusTreeNode<T>): void {
@@ -153,8 +284,8 @@ export class BPlusTreeInternalNode<T> extends BPlusTreeNode<T> {
   }
 
   splitIfNeeded(): void {
-    // max data length: order
-    const order = this.owner.order + 1;
+    // max data length: order - 1
+    const order = this.owner.order;
     if (this.data.length < order) {
       // no need to split
       return;
@@ -189,6 +320,82 @@ export class BPlusTreeInternalNode<T> extends BPlusTreeNode<T> {
       this.parent.splitIfNeeded();
     }
   }
+
+  delete(value: T): boolean {
+    const index = this.getLocation(value);
+    // abnormal case
+    if (!this.children[index]) {
+      throw new Error('Tree structure is wrong');
+    }
+
+    // traverse down appropriate branch
+    return this.children[index].delete(value);
+  }
+
+  protected rotateRight(leftSibling: BPlusTreeNode<T>, index: number): void {
+    if (!this.parent || this.isLeaf || !(leftSibling instanceof BPlusTreeInternalNode)) {
+      return;
+    }
+
+    // rotate right internal node:
+    //  - move last child (other node) of left node to current node first child
+    //  - move separator to current node first data
+    //  - assign separator = left node last data, also remove that left node last data
+
+    const lastChildOfLeft = leftSibling.children.splice(-1, 1)[0];
+    this.children.unshift(lastChildOfLeft);
+    lastChildOfLeft.parent = this;
+
+    this.data.unshift(this.parent.data[index]);
+
+    this.parent.data[index] = leftSibling.data.splice(-1, 1)[0];
+  }
+
+  protected rotateLeft(rightSibling: BPlusTreeNode<T>, index: number): void {
+    if (!this.parent || this.isLeaf || !(rightSibling instanceof BPlusTreeInternalNode)) {
+      return;
+    }
+
+    // rotate left internal node:
+    //  - move first child (other node) of right node to current node last child
+    //  - move separator to current node last data
+    //  - assign separator = right node first data
+    //  - remove right node first data
+
+    const firstChildOfRight = rightSibling.children.shift();
+    if (!firstChildOfRight) {
+      throw new Error('cannot rotate left because right sibling has no child');
+    }
+    firstChildOfRight.parent = this;
+    this.children.push(firstChildOfRight);
+
+    this.data.push(this.parent.data[index]);
+
+    this.parent.data[index] = rightSibling.data[0];
+    rightSibling.data.shift();
+  }
+
+  protected mergeRight(rightNode: BPlusTreeNode<T>, index: number): void {
+    if (!this.parent || this.isLeaf || !(rightNode instanceof BPlusTreeInternalNode)) {
+      return;
+    }
+
+    // merge right:
+    //  - current data + separator + rightNode data
+    //  - current children + rightNode children
+    //  - update right node's children parent
+    //  - remove parent separator
+    //  - remove rightNode from parent (index + 1)
+    //  - release rightNode data ?
+    //  - call rebalancingIfNeed on parent recursively
+    this.data = this.data.concat([this.parent.data[index]], rightNode.data);
+    rightNode.children.forEach((child) => (child.parent = this));
+    this.children = this.children.concat(rightNode.children);
+    this.parent.data.splice(index, 1);
+    this.parent.children.splice(index + 1, 1);
+
+    this.parent.rebalancingIfNeed();
+  }
 }
 
 export class BPlusTree<T> {
@@ -217,8 +424,12 @@ export class BPlusTree<T> {
     }
   }
 
-  insert(value: T) {
+  insert(value: T): void {
     this.root.insert(value);
+  }
+
+  delete(value: T): boolean {
+    return this.root.delete(value);
   }
 
   iterate(callback: (value: T) => any) {
@@ -241,8 +452,9 @@ export class BPlusTree<T> {
     }
   }
 
-  // apply BFS to print all contents of tree, useful in debug
-  dump() {
+  // return all contents of tree in visual string format, useful in debug
+  dump(): string {
+    let content = '';
     let children = [this.root];
     let height = 0;
     while (children.length) {
@@ -256,10 +468,12 @@ export class BPlusTree<T> {
         }
       }
 
-      console.log('-----', height, ':', line);
+      content += `--- ${height}: ${line}\n`;
 
       children = nextChildren;
       height++;
     }
+
+    return content;
   }
 }
