@@ -11,11 +11,54 @@ export abstract class BPlusTreeNode<T> {
   }
 
   abstract insert(value: T): void;
-  abstract splitIfNeeded(): void;
   abstract delete(value: T): boolean;
 
   get isRoot(): boolean {
     return this.parent === null;
+  }
+
+  splitIfNeeded(): void {
+    // max data length: order - 1
+    const order = this.owner.order;
+    if (this.data.length < order) {
+      // no need to split
+      return;
+    }
+
+    const middleIndex = Math.ceil(this.data.length / 2);
+    const middleData = this.data[middleIndex];
+
+    // create new node from right part
+    // not include middle data if internal node
+    const newNodeData = this.data.splice(middleIndex);
+    let newNode: BPlusTreeInternalNode<T> | BPlusTreeLeafNode<T>;
+    if (!this.isLeaf && this instanceof BPlusTreeInternalNode) {
+      // internal node
+      // remove middle data from new node
+      newNodeData.shift();
+      const newNodeChildren = this.children.splice(middleIndex + 1);
+      newNode = new BPlusTreeInternalNode<T>(this.owner, newNodeData, newNodeChildren);
+      // update children new parent
+      for (let i = 0; i < newNodeChildren.length; i++) {
+        newNodeChildren[i].parent = newNode;
+      }
+    } else {
+      newNode = new BPlusTreeLeafNode<T>(this.owner, newNodeData);
+      // TODO type fix
+      // update link
+      newNode.nextNode = (this as any).nextNode;
+      (this as any).nextNode = newNode;
+    }
+
+    // update parent
+    this.addToParent(middleData, newNode);
+
+    // attemp split all affected part
+    this.splitIfNeeded();
+    newNode.splitIfNeeded();
+    if (this.parent) {
+      this.parent.splitIfNeeded();
+    }
   }
 
   rebalancingIfNeed(): void {
@@ -61,7 +104,7 @@ export abstract class BPlusTreeNode<T> {
    * @param middleData
    * @param newNode middleData's right node
    */
-  protected addParent(middleData: T, newNode: BPlusTreeNode<T>) {
+  protected addToParent(middleData: T, newNode: BPlusTreeNode<T>) {
     if (this.parent) {
       newNode.parent = this.parent;
       this.parent.insertPurely(middleData, newNode);
@@ -134,40 +177,6 @@ export class BPlusTreeLeafNode<T> extends BPlusTreeNode<T> {
       this.data.push(value);
     } else {
       this.data.splice(index, 0, value);
-    }
-  }
-
-  splitIfNeeded(): void {
-    // max data length: order - 1
-    const order = this.owner.order;
-    if (this.data.length < order) {
-      // no need to split
-      return;
-    }
-
-    const middleIndex = Math.ceil(this.data.length / 2);
-    const middleData = this.data[middleIndex];
-
-    // create new node from right part
-    // right node include middleData
-    const newNodeData = this.data.slice(middleIndex);
-    const newNode = new BPlusTreeLeafNode<T>(this.owner, newNodeData);
-
-    // update current node (shorten)
-    this.data = this.data.slice(0, middleIndex);
-
-    // update link
-    newNode.nextNode = this.nextNode;
-    this.nextNode = newNode;
-
-    // update parent
-    this.addParent(middleData, newNode);
-
-    // attemp split all affected part
-    this.splitIfNeeded();
-    newNode.splitIfNeeded();
-    if (this.parent) {
-      this.parent.splitIfNeeded();
     }
   }
 
@@ -283,44 +292,6 @@ export class BPlusTreeInternalNode<T> extends BPlusTreeNode<T> {
     }
   }
 
-  splitIfNeeded(): void {
-    // max data length: order - 1
-    const order = this.owner.order;
-    if (this.data.length < order) {
-      // no need to split
-      return;
-    }
-
-    const middleIndex = Math.ceil(this.data.length / 2);
-    const middleData = this.data[middleIndex];
-
-    // TODO use splice
-    // create new node from right part
-    // not include middle data
-    const newNodeData = this.data.slice(middleIndex + 1);
-    const newNodeChildren = this.children.slice(middleIndex + 1);
-    const newNode = new BPlusTreeInternalNode<T>(this.owner, newNodeData, newNodeChildren);
-
-    // update children new parent
-    for (let i = 0; i < newNodeChildren.length; i++) {
-      newNodeChildren[i].parent = newNode;
-    }
-
-    // update current node (shorten)
-    this.data = this.data.slice(0, middleIndex);
-    this.children = this.children.slice(0, middleIndex + 1);
-
-    // update parent
-    this.addParent(middleData, newNode);
-
-    // attemp split all affected part
-    this.splitIfNeeded();
-    newNode.splitIfNeeded();
-    if (this.parent) {
-      this.parent.splitIfNeeded();
-    }
-  }
-
   delete(value: T): boolean {
     const index = this.getLocation(value);
     // abnormal case
@@ -410,7 +381,7 @@ export class BPlusTree<T> {
     this.order = order;
     this.nodeMinLength = Math.floor(order / 2);
     this.compareFunc = compareFunc;
-    this.root = this.firstLeaf = new BPlusTreeLeafNode<T>(this, data);
+    this.root = this.firstLeaf = new BPlusTreeLeafNode<T>(this, data.slice());
     this.root.splitIfNeeded();
   }
 
