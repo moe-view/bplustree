@@ -449,12 +449,6 @@ function checkBPlusTree(tree: BPlusTree<number>, elements: number[]) {
   }
 
   // check data
-  let data: number[] = [];
-  let leaf: BPlusTreeLeafNode<number> | null = firstLeaf;
-  while (leaf) {
-    data = data.concat(leaf.data);
-    leaf = leaf.nextNode;
-  }
-
+  const data = Array.from(tree);
   expect(data).toEqual(elements);
 }
