@@ -21,8 +21,13 @@ bTree.delete(1);
 bTree.delete(2);
 ```
 ## Test
+
 ```
+<!-- spec test -->
 yarn test
+<!-- performance test -->
+yarn test:perf
 ```
+
 ## Demo
 [B+tree visualization](https://visual-algo.firebaseapp.com/)
