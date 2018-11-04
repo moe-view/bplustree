@@ -369,7 +369,7 @@ export class BPlusTreeInternalNode<T> extends BPlusTreeNode<T> {
   }
 }
 
-export class BPlusTree<T> {
+export class BPlusTree<T> implements Iterable<T> {
   readonly compareFunc: (t1: T, t2: T) => -1 | 0 | 1;
   readonly order: number;
   readonly nodeMinLength: number;
@@ -383,6 +383,37 @@ export class BPlusTree<T> {
     this.compareFunc = compareFunc;
     this.root = this.firstLeaf = new BPlusTreeLeafNode<T>(this, data.slice());
     this.root.splitIfNeeded();
+  }
+
+  [Symbol.iterator](): Iterator<T> {
+    let item: BPlusTreeLeafNode<T> | null = this.firstLeaf;
+    let index = 0;
+
+    return {
+      next(): IteratorResult<T> {
+        if (!item || !item.data.length) {
+          return {
+            done: true,
+            // workaround for passing type check
+            value: null!,
+          };
+        }
+
+        const value = item.data[index];
+        index++;
+
+        if (index >= item.data.length) {
+          // go next leaf
+          item = item.nextNode;
+          index = 0;
+        }
+
+        return {
+          done: false,
+          value,
+        };
+      },
+    };
   }
 
   updateRoot() {
