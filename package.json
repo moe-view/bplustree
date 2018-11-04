@@ -23,6 +23,7 @@
     "format:ts:import": "import-sort --write '{modules,projects}/**/*.ts'",
     "jest": "jest -c jest.config.js",
     "test": "yarn run jest",
+    "test:perf": "ts-node src/test-performance/b-plus-tree-performance.test.ts",
     "tsc": "tsc -p tsconfig.json",
     "tslint": "tslint -p tsconfig.json"
   },
