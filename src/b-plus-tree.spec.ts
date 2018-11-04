@@ -1,15 +1,5 @@
-import { BPlusTree, BPlusTreeNode, BPlusTreeLeafNode, BPlusTreeInternalNode } from './b-plus-tree';
-
-const compareFunc = (n1: number, n2: number) => {
-  if (n1 < n2) {
-    return -1;
-  }
-  if (n1 === n2) {
-    return 0;
-  }
-
-  return 1;
-};
+import { BPlusTree } from './b-plus-tree';
+import { checkBPlusTree, generateSequenceArray, normalizeTreeContent, compareFunc } from './b-plus-tree-test.util';
 
 const bPlusTreeOrder = 4;
 
@@ -282,7 +272,7 @@ describe('bPlusTree', () => {
 
   it('should delete some from [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]', () => {
     const array = generateSequenceArray(10);
-    bTree = new BPlusTree<number>(4, compareFunc, array);
+    bTree = new BPlusTree<number>(bPlusTreeOrder, compareFunc, array);
 
     bTree.delete(3);
     bTree.delete(7);
@@ -293,7 +283,7 @@ describe('bPlusTree', () => {
 
   it('should insert, delete multiple time from [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]', () => {
     const array = generateSequenceArray(10);
-    bTree = new BPlusTree<number>(4, compareFunc, array);
+    bTree = new BPlusTree<number>(bPlusTreeOrder, compareFunc, array);
 
     bTree.insert(15);
     bTree.insert(20);
@@ -313,7 +303,7 @@ describe('bPlusTree', () => {
 
   it('should delete all data 100', () => {
     const array = generateSequenceArray(99);
-    bTree = new BPlusTree<number>(4, compareFunc, array);
+    bTree = new BPlusTree<number>(bPlusTreeOrder, compareFunc, array);
 
     bTree.insert(100);
 
@@ -330,7 +320,7 @@ describe('bPlusTree', () => {
 
   it('should insert, delete multiple large amount data', () => {
     const origin = generateSequenceArray(20000);
-    bTree = new BPlusTree<number>(4, compareFunc, origin);
+    bTree = new BPlusTree<number>(bPlusTreeOrder, compareFunc, origin);
 
     const array = [...origin];
     const toDelete = array.splice(600, 8000);
@@ -362,99 +352,3 @@ describe('bPlusTree', () => {
     checkBPlusTree(bTree, origin);
   });
 });
-
-function normalizeTreeContent(s: string): string {
-  return s.replace(/(\s)*\n(\s)*/g, '\n').trim();
-}
-
-/**
- * generate from 1 -> n
- * @param n
- */
-function generateSequenceArray(n: number): number[] {
-  const array = [];
-  for (let i = 0; i < n; i++) {
-    array.push(i + 1);
-  }
-
-  return array;
-}
-
-/**
- * Shuffles array in place. ES6 version
- * @param {Array} a items An array containing the items.
- */
-function shuffle(a: number[]): number[] {
-  a = [...a];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-// check BPlusTree of number, increase order
-function checkBPlusTree(tree: BPlusTree<number>, elements: number[]) {
-  const root = tree.root;
-  expect(root.parent).toBeNull();
-
-  if (elements.length === 0) {
-    // empty tree
-    expect(root.data.length).toBe(0);
-    expect(root.isLeaf).toBe(true);
-    return;
-  }
-
-  // check BPlusTree internal structure
-  const firstLeaf = tree.firstLeaf;
-  let nodes = [root];
-  while (nodes.length) {
-    const reachedLeaf = nodes[0].isLeaf;
-    let nextNodes: BPlusTreeNode<number>[] = [];
-
-    nodes.forEach(node => {
-      expect(node.data.length).toBeGreaterThanOrEqual(1);
-      if (reachedLeaf) {
-        expect(node.isLeaf).toBe(true);
-      } else if (node instanceof BPlusTreeInternalNode) {
-        expect(node.children.length).toBe(node.data.length + 1);
-      }
-
-      // node's data in increase order
-      for (let i = 1; i < node.data.length; i++) {
-        expect(node.data[i]).toBeGreaterThanOrEqual(node.data[i - 1]);
-      }
-
-      if (!reachedLeaf && node instanceof BPlusTreeInternalNode) {
-        node.children.forEach((child, index) => {
-          // children's parent is this node
-          expect(child.parent).toBe(node);
-          if (index > 0) {
-            // right child data is greater than or equal separator
-            expect(child.data[0]).toBeGreaterThanOrEqual(node.data[index - 1]);
-          }
-
-          if (index < node.data.length) {
-            // left child data is less than separator
-            expect(child.data[child.data.length - 1]).toBeLessThan(node.data[index]);
-          }
-        });
-
-        nextNodes = nextNodes.concat(node.children);
-      }
-    });
-
-    // go to next height level
-    nodes = nextNodes;
-  }
-
-  // check data
-  let data: number[] = [];
-  let leaf: BPlusTreeLeafNode<number> | null = firstLeaf;
-  while (leaf) {
-    data = data.concat(leaf.data);
-    leaf = leaf.nextNode;
-  }
-
-  expect(data).toEqual(elements);
-}
