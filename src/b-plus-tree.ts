@@ -10,6 +10,7 @@ export abstract class BPlusTreeNode<T> {
     this.data = data;
   }
 
+  abstract exist(value: T): boolean;
   abstract insert(value: T): void;
   abstract delete(value: T): boolean;
 
@@ -25,6 +26,7 @@ export abstract class BPlusTreeNode<T> {
       return;
     }
 
+    // TODO use floor, also need update test cases
     const middleIndex = Math.ceil(this.data.length / 2);
     const middleData = this.data[middleIndex];
 
@@ -163,6 +165,16 @@ export class BPlusTreeLeafNode<T> extends BPlusTreeNode<T> {
     return true;
   }
 
+  exist(value: T): boolean {
+    const index = this.getLocation(value);
+    const compareFunc = this.owner.compareFunc;
+    if (compareFunc(value, this.data[index - 1]) === 0) {
+      return true;
+    }
+
+    return false;
+  }
+
   insert(value: T): void {
     this.insertPurely(value);
     this.splitIfNeeded();
@@ -267,6 +279,12 @@ export class BPlusTreeInternalNode<T> extends BPlusTreeNode<T> {
   constructor(owner: BPlusTree<T>, data: T[] = [], children: BPlusTreeNode<T>[] = []) {
     super(owner, data);
     this.children = children;
+  }
+
+  exist(value: T): boolean {
+    const index = this.getLocation(value);
+
+    return this.children[index].exist(value);
   }
 
   insert(value: T): void {
@@ -424,6 +442,10 @@ export class BPlusTree<T> implements Iterable<T> {
     if (this.root instanceof BPlusTreeInternalNode && !this.root.isLeaf && this.root.data.length === 0 && this.root.children.length === 1) {
       this.root = this.root.children[0];
     }
+  }
+
+  exist(value: T): boolean {
+    return this.root.exist(value);
   }
 
   insert(value: T): void {

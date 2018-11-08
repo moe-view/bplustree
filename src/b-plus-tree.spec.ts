@@ -319,11 +319,11 @@ describe('bPlusTree', () => {
   });
 
   it('should insert, delete multiple large amount data', () => {
-    const origin = generateSequenceArray(20000);
+    const origin = generateSequenceArray(5000);
     bTree = new BPlusTree<number>(bPlusTreeOrder, compareFunc, origin);
 
     const array = [...origin];
-    const toDelete = array.splice(600, 8000);
+    const toDelete = array.splice(600, 800);
     for (let i = 0; i < toDelete.length; i++) {
       bTree.delete(toDelete[i]);
     }
@@ -349,6 +349,22 @@ describe('bPlusTree', () => {
       bTree.insert(origin[i]);
     }
 
+    checkBPlusTree(bTree, origin);
+  });
+
+  it('should check exist', () => {
+    const origin = generateSequenceArray(20);
+    bTree = new BPlusTree<number>(4, compareFunc, origin);
+
+    expect(bTree.exist(20)).toBe(true);
+    expect(bTree.exist(21)).toBe(false);
+  });
+
+  it('should not be affected when delete not exist element', () => {
+    const origin = generateSequenceArray(20);
+    bTree = new BPlusTree<number>(4, compareFunc, origin);
+
+    bTree.delete(100);
     checkBPlusTree(bTree, origin);
   });
 });
